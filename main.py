@@ -28,10 +28,7 @@ def placeBoxes(frame, preds):
 
     return final
 
-def explain():
-    occlusion = Occlusion(model)
 
-    
 
 
 # main frame prediction loop
