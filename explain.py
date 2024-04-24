@@ -12,7 +12,7 @@ from captum.attr import Occlusion
 model = YOLO('model/yolov8n.pt')
 model.to('cuda')
 
-def model_wrapper(input):
+def model_wrapper(input):    
     tensor, device = model.model(input)
     
     return tensor
@@ -29,7 +29,7 @@ transform_normalize = v2.Normalize(
 
 def transform_img(img_num):     
 
-    img = cv.resize(temp_pics[img_num],(120,120))
+    img = cv.resize(temp_pics[img_num],(128,128))
     
     tranposed = np.transpose(img,(2,0,1))   
 
@@ -39,10 +39,10 @@ def transform_img(img_num):
 
     input = normalised.unsqueeze(0)      
     
-    explain(input)
+    explain(input, img_num)
 
 
-def explain(img):     
+def explain(img, num):     
 
 
     torch.cuda.empty_cache()
@@ -52,8 +52,10 @@ def explain(img):
                                     sliding_window_shapes=(3, 15, 15),
                                     baselines=0)   
     
-    _ = viz.visualize_image_attr_multiple(np.transpose(attributions_occ.squeeze().cpu().detach().numpy(), (1,2,0)),
-                                    np.transpose(pic.squeeze().cpu().detach().numpy(), (1,2,0)),
+    print(attributions_occ.cpu().detach().numpy().shape)
+    
+    _ = viz.visualize_image_attr_multiple(np.transpose(attributions_occ.squeeze().cpu().detach().numpy(),(1,2,0)),
+                                    np.transpose(img.squeeze().cpu().detach().numpy(),(1,2,0)),
                                     ["original_image", "heat_map"],
                                     ["all", "positive"],
                                     show_colorbar=True,
