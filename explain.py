@@ -10,8 +10,14 @@ from captum.attr import visualization as viz
 from captum.attr import Occlusion
 
 model = YOLO('model/yolov8n.pt')
+model.to('cuda')
 
-occlusion = Occlusion(model.model)
+def model_wrapper(input):
+    tensor, device = model.model(input)
+    
+    return tensor
+
+occlusion = Occlusion(model_wrapper)
 
 temp_pics = []
 input_pics = []
@@ -21,43 +27,37 @@ transform_normalize = v2.Normalize(
         std=[0.229, 0.224, 0.225]
     )
 
-def transform_img():    
+def transform_img(img_num):     
 
-    for pic in temp_pics:
-
-        img = cv.resize(pic,(320,320))
-        tranposed = np.transpose(img,(2,0,1))   
-
-        input = torch.tensor(tranposed).float()    
-
-        normalised = transform_normalize(input)         
-
-        input = normalised.unsqueeze(0)
-
-        input_pics.append(input.cuda())    
+    img = cv.resize(temp_pics[img_num],(120,120))
     
-    explain()
+    tranposed = np.transpose(img,(2,0,1))   
 
+    input = torch.tensor(tranposed, device=('cuda')).float()    
 
-def explain():      
+    normalised = transform_normalize(input)         
+
+    input = normalised.unsqueeze(0)      
     
+    explain(input)
 
-    for i, image in enumerate(input_pics):
-        results = model(temp_pics[i])       
-        
-        attributions_occ = occlusion.attribute(image,                                        
-                                        strides = (3, 8, 8),                                        
-                                        sliding_window_shapes=(3, 15, 15),
-                                        baselines=0)
-        
-        print(attributions_occ)
-        
-        _ = viz.visualize_image_attr_multiple(np.transpose(attributions_occ.squeeze().cpu().detach().numpy(), (1,2,0)),
-                                        np.transpose(pic.squeeze().cpu().detach().numpy(), (1,2,0)),
-                                        ["original_image", "heat_map"],
-                                        ["all", "positive"],
-                                        show_colorbar=True,
-                                        outlier_perc=2)
+
+def explain(img):     
+
+
+    torch.cuda.empty_cache()
+
+    attributions_occ = occlusion.attribute(img,                                        
+                                    strides = (3, 7, 7),                                        
+                                    sliding_window_shapes=(3, 15, 15),
+                                    baselines=0)   
+    
+    _ = viz.visualize_image_attr_multiple(np.transpose(attributions_occ.squeeze().cpu().detach().numpy(), (1,2,0)),
+                                    np.transpose(pic.squeeze().cpu().detach().numpy(), (1,2,0)),
+                                    ["original_image", "heat_map"],
+                                    ["all", "positive"],
+                                    show_colorbar=True,
+                                    outlier_perc=2)            
     
 
 for pic in os.listdir('pics/val2017'):
@@ -65,5 +65,7 @@ for pic in os.listdir('pics/val2017'):
     
     temp_pics.append(temp)
 
-transform_img()
+
+transform_img(0)
+
 
