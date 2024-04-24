@@ -5,6 +5,7 @@ import cv2 as cv
 import torch
 from torchvision.transforms import v2
 from ultralytics import YOLO
+import matplotlib.pyplot as plt
 
 from captum.attr import visualization as viz
 from captum.attr import Occlusion
@@ -39,35 +40,55 @@ def transform_img(img_num):
 
     input = normalised.unsqueeze(0)      
     
-    explain(input, img_num)
+    explain(input, tranposed)
 
 
-def explain(img, num):     
+def explain(img, tranposed):     
 
 
     torch.cuda.empty_cache()
 
     attributions_occ = occlusion.attribute(img,                                        
-                                    strides = (3, 7, 7),                                        
+                                    strides = (3, 8, 8),    
+                                    target=                                    
                                     sliding_window_shapes=(3, 15, 15),
-                                    baselines=0)   
+                                    baselines=0)  
+     
+    img_mat = attributions_occ.squeeze().cpu().detach().numpy()    
+
+    output = np.zeros_like(tranposed,np.float32)
     
-    print(attributions_occ.cpu().detach().numpy().shape)
+    for slices in img_mat:
+        
+        np.add(tranposed, slices, out=output)
+
+    img_trans = np.transpose(output, (1,2,0))
+    img_orig = np.transpose(tranposed, (1,2,0))
+
+    show_img(img_orig, img_trans)
+
+
     
-    _ = viz.visualize_image_attr_multiple(np.transpose(attributions_occ.squeeze().cpu().detach().numpy(),(1,2,0)),
-                                    np.transpose(img.squeeze().cpu().detach().numpy(),(1,2,0)),
-                                    ["original_image", "heat_map"],
-                                    ["all", "positive"],
-                                    show_colorbar=True,
-                                    outlier_perc=2)            
+    
+def show_img(img1, img2):
+    fig = plt.figure(figsize=(10, 7)) 
+
+    fig.add_subplot(1,2,1)
+
+    plt.imshow(img1)    
+    fig.add_subplot(1,2,2
+                    )
+    plt.imshow(img2)
+
+    plt.show()  
     
 
 for pic in os.listdir('pics/val2017'):
-    temp = cv.imread('pics/val2017/' + pic)
+    temp = cv.imread('pics/val2017/' + pic, cv.COLOR_BGR2RGB)
     
     temp_pics.append(temp)
 
 
-transform_img(0)
+transform_img(2)
 
 
