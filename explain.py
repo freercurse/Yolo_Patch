@@ -14,9 +14,9 @@ model = YOLO('model/yolov8n.pt')
 model.to('cuda')
 
 def model_wrapper(input):    
-    tensor, device = model.model(input)
+    results, classes = model.model(input)
     
-    return tensor
+    return torch.argmax(results)
 
 occlusion = Occlusion(model_wrapper)
 
@@ -32,6 +32,7 @@ def transform_img(img_num):
 
     img = cv.resize(temp_pics[img_num],(128,128))
     
+    
     tranposed = np.transpose(img,(2,0,1))   
 
     input = torch.tensor(tranposed, device=('cuda')).float()    
@@ -43,34 +44,29 @@ def transform_img(img_num):
     explain(input, tranposed)
 
 
-def explain(img, tranposed):     
-
+def explain(img, tranposed): 
 
     torch.cuda.empty_cache()
 
-    attributions_occ = occlusion.attribute(img,                                        
-                                    strides = (3, 8, 8),    
-                                    target=                                    
+    attributions_occ = occlusion.attribute(img,          
+                                                                
+                                    strides = (3, 8, 8),                                                                       
                                     sliding_window_shapes=(3, 15, 15),
                                     baselines=0)  
      
-    img_mat = attributions_occ.squeeze().cpu().detach().numpy()    
+    img_mat = attributions_occ.squeeze().cpu().detach().numpy()      
 
-    output = np.zeros_like(tranposed,np.float32)
-    
-    for slices in img_mat:
-        
-        np.add(tranposed, slices, out=output)
-
-    img_trans = np.transpose(output, (1,2,0))
+    print(img_mat.shape)
+    img_trans = np.transpose(img_mat, (1,2,0))
     img_orig = np.transpose(tranposed, (1,2,0))
 
-    show_img(img_orig, img_trans)
+    
 
 
     
     
 def show_img(img1, img2):
+    print(np.unique(img2))
     fig = plt.figure(figsize=(10, 7)) 
 
     fig.add_subplot(1,2,1)
@@ -84,11 +80,14 @@ def show_img(img1, img2):
     
 
 for pic in os.listdir('pics/val2017'):
-    temp = cv.imread('pics/val2017/' + pic, cv.COLOR_BGR2RGB)
+    temp = cv.imread('pics/val2017/' + pic, cv.COLOR_BAYER_BGGR2RGB)
     
     temp_pics.append(temp)
 
+for i in range(len(temp_pics)):
+    transform_img(i)
 
-transform_img(2)
+    cv.waitKey(0)
+
 
 
