@@ -14,7 +14,7 @@ model = YOLO('model/yolov8n.pt')
 model.to('cuda')
 
 def model_wrapper(input):    
-    results, classes = model.model(input)
+    results, _ = model.model(input)
     
     return torch.argmax(results)
 
@@ -48,32 +48,38 @@ def explain(img, tranposed):
 
     torch.cuda.empty_cache()
 
-    attributions_occ = occlusion.attribute(img,          
-                                                                
-                                    strides = (3, 8, 8),                                                                       
-                                    sliding_window_shapes=(3, 15, 15),
+    normalised = np.zeros_like(tranposed)
+
+    attributions_occ = occlusion.attribute(img,                                                               
+                                    strides = (3, 6, 6),                                                                       
+                                    sliding_window_shapes=(3, 13, 13),
                                     baselines=0)  
      
-    img_mat = attributions_occ.squeeze().cpu().detach().numpy()      
-
-    print(img_mat.shape)
-    img_trans = np.transpose(img_mat, (1,2,0))
-    img_orig = np.transpose(tranposed, (1,2,0))
-
+    img_mat = attributions_occ.squeeze().cpu().detach().numpy()   
     
 
+    max = np.max(img_mat)
+    min = np.min(img_mat)
 
+    for i in range(img_mat.shape[0]):
+        for j in range(img_mat.shape[1]):
+            normalised[i][j] = img_mat[i][j] - min * (255/(max-min))
+        
+    
+    img_trans = np.transpose(normalised, (1,2,0))
+    img_orig = np.transpose(tranposed, (1,2,0))
+
+    show_img(img_orig, img_trans)
     
     
 def show_img(img1, img2):
-    print(np.unique(img2))
+   
     fig = plt.figure(figsize=(10, 7)) 
 
     fig.add_subplot(1,2,1)
 
     plt.imshow(img1)    
-    fig.add_subplot(1,2,2
-                    )
+    fig.add_subplot(1,2,2)
     plt.imshow(img2)
 
     plt.show()  
