@@ -17,25 +17,36 @@ LOGGER.setLevel(logging.WARNING)
 model = YOLO('model/yolov8n.pt')
 model.to('cuda')
 
-Patch_threshold = 24
+Patch_threshold = 36
 images = []
 
 #ATTACKED IMAGE INFERANCE
 
+def infer_attacked(attacked_image, image):
 
+    Compare_images = [attacked_image, image]
+    
+    results = model.predict(Compare_images, classes=range(0,79))    
+
+    for i, preds in enumerate(results):
+        print("Class Prection - Image ", i ,":")
+        print(preds.boxes.cls)
+        print("Class Confidence - Image", i ,":")
+        print(preds.boxes.conf)
 
 #PATCH PLACEMENT
 def place_random(patch):
     random_file = random.randint(0, len(images)-1)
     image = images[random_file] 
+    image_copy = np.copy(image)
 
     patch_pixels = []
     creation_counter = 0
 
     temp = np.zeros_like(image)       
 
-    random_placement_x = random.randint(0 + Patch_threshold, image.shape[0] - Patch_threshold )
-    random_placement_y = random.randint(0 + Patch_threshold, image.shape[1] - Patch_threshold )
+    random_placement_y = random.randint(0 + Patch_threshold , image.shape[0] - Patch_threshold )
+    random_placement_x = random.randint(0 + Patch_threshold , image.shape[1] - Patch_threshold )    
 
     cv.circle(temp, (random_placement_x, random_placement_y), Patch_threshold,(255,255,255), -1)     
 
@@ -44,13 +55,13 @@ def place_random(patch):
             if(patch[x][y][0] > 10):
                 patch_pixels.append(patch[x][y])
 
-    for x in range(0, temp.shape[0]):
-        for y in range(0, temp.shape[1]):            
+    for x in range(0, temp.shape[0]-1):
+        for y in range(0, temp.shape[1] -1):            
             if(temp[x][y][0] > 100):
                 image[x][y] = patch_pixels[creation_counter]
                 creation_counter += 1 
 
-    return image    
+    return (image, image_copy)    
 
 #PATCH GENERATION
 
@@ -101,8 +112,10 @@ def start_explanation(image):
 
     for i, sizes in enumerate(process):
         print("Starting Pass ", i ," - in Process")
+
         ex = explain(image, sizes, stride)
         explanations.append(ex)
+
         print("Pass ", i ," Completed")
     
     print("Completed Explanation")
@@ -126,7 +139,7 @@ def explain(image, window_size, stride):
             occluded_tensor = preprocess_image(occluded_image)
             
             with torch.no_grad():
-                results = model(occluded_tensor, classes=[11])                
+                results = model.predict(occluded_tensor, classes=[11])                
                 for preds in results:
                     for box in preds.boxes:                        
                         conf = box.conf.cpu().numpy()
@@ -157,13 +170,32 @@ for filename in os.listdir(folder):
 
 #PROGRAM CYCLING
 
+#Start with an image to extract a patch from
 temp = cv.imread('pics/val2017/000000000724.jpg')
-map = start_explanation(temp)
-patch = start_patching(map, temp)
-attack = place_random(patch)
 
-cv.imshow("Attacked Image", attack)
-cv.waitKey(0)
-cv.destroyAllWindows()
+#Perform an occlusion based explanation to extract a saliency map
+map = start_explanation(temp)
+
+#use the saliency to extract the patch a circular patch from the chosen image
+patch = start_patching(map, temp)
+
+#generate a random image and a random location for that patch 
+attack, copy = place_random(patch)
+
+#run the attacked image through the model to evaluate the effectiveness
+eval = infer_attacked(attack, copy)
+
+#SHOW IMAGE
+
+fig = plt.figure(figsize=(10, 7)) 
+
+fig.add_subplot(1,2,1)
+plt.imshow(attack)    
+
+fig.add_subplot(1,2,2)
+plt.imshow(copy)
+
+plt.show()  
+
     
 
