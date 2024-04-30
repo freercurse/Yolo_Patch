@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 import torchvision.transforms as transforms
 import torch
@@ -14,7 +15,40 @@ LOGGER.setLevel(logging.WARNING)
 model = YOLO('model/yolov8n.pt')
 model.to('cuda')
 
+def remove_border(map):
+    print(map.shape)
 
+    for x in range(0, map.shape[0] ):
+        for y in range(0, map.shape[1] ):            
+            if(map[x][y] <= 10):
+                map[x][y] = 255
+
+    return map
+
+#PATCH GENERATION
+
+def start_patching(map, image, thresh): 
+    unbordered = remove_border(map)
+    _, _, min, _ =cv.minMaxLoc(unbordered)
+
+    temp = np.zeros_like(image)
+    patch = np.zeros_like(image)
+
+    cv.circle(temp, min, thresh,(255,255,255), -1)      
+    cv.imshow("temp", temp)
+
+    for x in range(0, patch.shape[0] -1):
+        for y in range(0, patch.shape[1] -1):            
+            if(temp[x][y][0] > 100):
+                patch[x][y] = image[x][y]  
+
+    return patch
+    
+
+
+
+
+#PREPROCESS AND EXPLANATION GENERATION
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -33,20 +67,21 @@ def start_explanation(image):
     explanations = []
 
     for i, sizes in enumerate(process):
-        print("Starting Explaination ", i ," Process")
+        print("Starting Pass ", i ," - in Process")
         ex = explain(image, sizes, stride)
         explanations.append(ex)
-        print("Completed Explaination ", i ," Process")
+        print("Pass ", i ," Completed")
     
+    print("Completed Explanation")
     combined = np.min(np.stack(explanations), axis=0)
 
     normalized_saliency_map = (combined - combined.min()) / (combined.max() - combined.min())
     normalized_saliency_map = (normalized_saliency_map * 255).astype(np.uint8)
 
-    cv.imshow("Saliency Map", combined)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
+    return normalized_saliency_map
 
+    
+    
 
 
 
@@ -84,5 +119,14 @@ def occlude_image(image, y, x, window_size):
 
     return occluded_image
 
+
+
 temp = cv.imread('pics/val2017/000000000724.jpg')
-start_explanation(temp)
+map = start_explanation(temp)
+patch = start_patching(map, temp, 24)
+
+cv.imshow("patch", patch)
+cv.waitKey(0)
+cv.destroyAllWindows()
+    
+
